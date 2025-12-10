@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <ApplicationId>com.MonoGame.CBPlatformTest</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <AssemblyName>CBPlatformTest</AssemblyName>
+    <WorkflowMode>false</WorkflowMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CBPlatformTest.Core\CBPlatformTest.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.5-develop.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- For CI/CD with RuntimeIdentifier -->
+    <AndroidAsset Include="$(ProjectDir)bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\Content\**\*" Condition="'$(RuntimeIdentifier)' != '' AND Exists('$(ProjectDir)bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\Content')">
+      <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </AndroidAsset>
+    <!-- For local builds without RuntimeIdentifier -->
+    <AndroidAsset Include="$(ProjectDir)$(OutputPath)Content\**\*" Condition="'$(RuntimeIdentifier)' == '' AND Exists('$(ProjectDir)$(OutputPath)Content')">
+      <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </AndroidAsset>
+  </ItemGroup>
+  <Target Name="BuildContent" BeforeTargets="Build" Condition="'$(WorkflowMode)' != 'true'">
+    <PropertyGroup>
+      <ContentOutput>$(ProjectDir)$(OutputPath)</ContentOutput>
+      <ContentTemp>$(ProjectDir)$(IntermediateOutputPath)</ContentTemp>
+      <ContentArgs>build -p $(MonoGamePlatform) -s Assets -o $(ContentOutput) -i $(ContentTemp)</ContentArgs>
+    </PropertyGroup>
+    <MSbuild Projects="..\Content\Content.csproj" Targets="Build;Run"
+      Properties="RunArguments=$(ContentArgs);" />
+  </Target>
+</Project>

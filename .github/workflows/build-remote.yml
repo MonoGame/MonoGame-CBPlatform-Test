@@ -1,0 +1,69 @@
+name: Build Remote Content DesktopGL
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+
+env:
+  DotnetVersion: 9.0.307
+  Configuration: ${{ github.event.inputs.configuration || 'Release' }}
+
+jobs:
+  build-remote-desktopgl:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate global.json
+        run: |
+          echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '${{ env.DotnetVersion }}'
+          global-json-file: "./global.json"
+
+      - name: Build Content (DesktopGL)
+        id: build_content
+        uses: MonoGame/monogame-actions/build-content@v1
+        with:
+          content-builder-repo: 'SimonDarksideJ/MonoGame-CBPlatform-Builder'
+          content-builder-path: 'Content'
+          assets-repo: 'SimonDarksideJ/MonoGame-CBPlatform-Assets'
+          assets-path: ''
+          monogame-platform: 'DesktopGL'
+          output-folder: 'CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/win-x64/Content'
+          upload-output: 'true'
+
+      - name: Restore DesktopGL
+        working-directory: ./CBPlatformTest
+        run: dotnet restore CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -r win-x64
+
+      - name: Build DesktopGL
+        working-directory: ./CBPlatformTest
+        run: dotnet build -c ${{ env.Configuration }} CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -r win-x64 -p:WorkflowMode=true
+
+      - name: Upload DesktopGL build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: DesktopGL-build
+          path: CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/
+
+      - name: Publish DesktopGL
+        working-directory: ./CBPlatformTest
+        run: dotnet publish CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -c ${{ env.Configuration }} -r win-x64 -p:PublishReadyToRun=false -p:TieredCompilation=false -p:WorkflowMode=true --self-contained
+
+      - name: Upload DesktopGL publish artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: DesktopGL-publish
+          path: CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/win-x64/publish/

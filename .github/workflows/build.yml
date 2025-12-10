@@ -1,0 +1,116 @@
+name: Build Multi-Platform
+
+on: 
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+
+env:
+  DotnetVersion: 9.0.307
+  Configuration: ${{ github.event.inputs.configuration || 'Release' }}
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - platform: iOS
+            os: macos-26
+            project: CBPlatformTest.iOS/CBPlatformTest.iOS.csproj
+            runtime: ios-arm64
+            workload: ios
+            tfm: net9.0-ios
+          - platform: DesktopGL
+            os: windows-latest
+            project: CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj
+            runtime: win-x64
+            workload: ""
+            tfm: net9.0
+          - platform: Android
+            os: windows-latest
+            project: CBPlatformTest.Android/CBPlatformTest.Android.csproj
+            runtime: android-arm64
+            workload: android
+            tfm: net9.0-android
+    steps:      
+
+      - uses: actions/checkout@v5
+
+      - name: Set output paths
+        id: paths
+        shell: bash
+        run: |
+          PROJECT_DIR=$(dirname "${{ matrix.project }}")
+          if [ "${{ matrix.platform }}" == "iOS" ]; then
+            RID_PATH="bin/${{ env.Configuration }}/${{ matrix.tfm }}"
+          elif [ "${{ matrix.platform }}" == "DesktopGL" ]; then
+            RID_PATH="bin/${{ env.Configuration }}/${{ matrix.tfm }}/${{ matrix.runtime }}"
+          else
+            RID_PATH="bin/${{ env.Configuration }}/${{ matrix.tfm }}/${{ matrix.runtime }}"
+          fi
+          echo "project_dir=$PROJECT_DIR" >> $GITHUB_OUTPUT
+          echo "rid_path=$RID_PATH" >> $GITHUB_OUTPUT
+          echo "content_output=./CBPlatformTest/$PROJECT_DIR/$RID_PATH/Content" >> $GITHUB_OUTPUT
+
+      - name: Generate global.json
+        run: |
+          echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '${{ env.DotnetVersion }}'
+          global-json-file: "./global.json"
+
+      - name: Install workload
+        if: ${{ matrix.workload != '' }}
+        run: dotnet workload install ${{ matrix.workload }}
+
+      - name: Process content
+        uses: MonoGame/monogame-actions/build-content@v1
+        with:
+          content-builder-path: "./CBPlatformTest/Content"
+          assets-path: "./CBPlatformTest/Content/Assets"
+          monogame-platform: ${{ matrix.platform }}
+          output-folder: ${{ steps.paths.outputs.content_output }}
+          configuration: ${{ env.Configuration }}
+
+      - name: Restore ${{ matrix.platform }}
+        working-directory: ./CBPlatformTest
+        run: dotnet restore ${{ matrix.project }} -r ${{ matrix.runtime }}
+
+      - name: Build ${{ matrix.platform }} (iOS)
+        if: ${{ matrix.platform == 'iOS' }}
+        working-directory: ./CBPlatformTest
+        run: dotnet build -c ${{ env.Configuration }} ${{ matrix.project }} -p:WorkflowMode=true
+
+      - name: Build ${{ matrix.platform }} (Other)
+        if: ${{ matrix.platform != 'iOS' }}
+        working-directory: ./CBPlatformTest
+        run: dotnet build -c ${{ env.Configuration }} ${{ matrix.project }} -r ${{ matrix.runtime }} -p:WorkflowMode=true
+
+      - name: Upload ${{ matrix.platform }} artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.platform }}-build
+          path: CBPlatformTest/${{ steps.paths.outputs.project_dir }}/bin/${{ env.Configuration }}/
+
+      - name: Publish ${{ matrix.platform }} release
+        if: ${{ matrix.platform != 'iOS' }}
+        working-directory: ./CBPlatformTest
+        run: dotnet publish ${{ matrix.project }} -c ${{ env.Configuration }} -r ${{ matrix.runtime }} -p:PublishReadyToRun=false -p:TieredCompilation=false -p:WorkflowMode=true --self-contained
+
+      - name: Upload ${{ matrix.platform }} publish artifact
+        if: ${{ matrix.platform != 'iOS' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.platform }}-publish
+          path: CBPlatformTest/${{ steps.paths.outputs.project_dir }}/bin/${{ env.Configuration }}/${{ matrix.tfm }}/${{ matrix.runtime }}/publish/
