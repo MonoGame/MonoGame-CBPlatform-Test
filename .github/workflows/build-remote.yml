@@ -41,16 +41,16 @@ jobs:
           assets-repo: 'SimonDarksideJ/MonoGame-CBPlatform-Assets'
           assets-path: ''
           monogame-platform: 'DesktopGL'
-          output-folder: 'CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/win-x64/Content'
+          output-folder: 'CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/Content'
           upload-output: 'true'
 
       - name: Restore DesktopGL
         working-directory: ./CBPlatformTest
-        run: dotnet restore CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -r win-x64
+        run: dotnet restore CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj
 
       - name: Build DesktopGL
         working-directory: ./CBPlatformTest
-        run: dotnet build -c ${{ env.Configuration }} CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -r win-x64 -p:WorkflowMode=true
+        run: dotnet build -c ${{ env.Configuration }} CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -p:WorkflowMode=true
 
       - name: Upload DesktopGL build artifact
         uses: actions/upload-artifact@v5
@@ -60,10 +60,10 @@ jobs:
 
       - name: Publish DesktopGL
         working-directory: ./CBPlatformTest
-        run: dotnet publish CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -c ${{ env.Configuration }} -r win-x64 -p:PublishReadyToRun=false -p:TieredCompilation=false -p:WorkflowMode=true --self-contained
+        run: dotnet publish CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -c ${{ env.Configuration }} -p:PublishReadyToRun=false -p:TieredCompilation=false -p:WorkflowMode=true
 
       - name: Upload DesktopGL publish artifact
         uses: actions/upload-artifact@v5
         with:
           name: DesktopGL-publish
-          path: CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/win-x64/publish/
+          path: CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/publish/
