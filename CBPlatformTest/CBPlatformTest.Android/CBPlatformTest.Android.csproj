@@ -8,12 +8,13 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <AssemblyName>CBPlatformTest</AssemblyName>
     <WorkflowMode>false</WorkflowMode>
+    <MonoGamePlatform>Android</MonoGamePlatform>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CBPlatformTest.Core\CBPlatformTest.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.5-develop.*" />
+    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.5-preview.*" />
   </ItemGroup>
   <ItemGroup>
     <!-- For CI/CD with RuntimeIdentifier -->
@@ -25,13 +26,5 @@
       <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </AndroidAsset>
   </ItemGroup>
-  <Target Name="BuildContent" BeforeTargets="Build" Condition="'$(WorkflowMode)' != 'true'">
-    <PropertyGroup>
-      <ContentOutput>$(ProjectDir)$(OutputPath)</ContentOutput>
-      <ContentTemp>$(ProjectDir)$(IntermediateOutputPath)</ContentTemp>
-      <ContentArgs>build -p $(MonoGamePlatform) -s Assets -o $(ContentOutput) -i $(ContentTemp)</ContentArgs>
-    </PropertyGroup>
-    <MSbuild Projects="..\Content\Content.csproj" Targets="Build;Run"
-      Properties="RunArguments=$(ContentArgs);" />
-  </Target>
+  <Import Project="..\Content\BuildContent.targets" />
 </Project>

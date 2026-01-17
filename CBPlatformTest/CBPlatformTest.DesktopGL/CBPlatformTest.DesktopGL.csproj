@@ -8,12 +8,13 @@
     <ApplicationIcon>../CBPlatformTest.Core/Content/Icon.ico</ApplicationIcon>
     <AssemblyName>CBPlatformTest</AssemblyName>
     <WorkflowMode>false</WorkflowMode>
+    <MonoGamePlatform>DesktopGL</MonoGamePlatform>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CBPlatformTest.Core\CBPlatformTest.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5-develop.*" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5-preview.*" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="$(OutputPath)Content\**\*" Condition="Exists('$(ProjectDir)$(OutputPath)Content')">
@@ -21,13 +22,5 @@
       <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
-  <Target Name="BuildContent" BeforeTargets="Build" Condition="'$(WorkflowMode)' != 'true'">
-    <PropertyGroup>
-      <ContentOutput>$(ProjectDir)$(OutputPath)</ContentOutput>
-      <ContentTemp>$(ProjectDir)$(IntermediateOutputPath)</ContentTemp>
-      <ContentArgs>build -p $(MonoGamePlatform) -s Assets -o $(ContentOutput) -i $(ContentTemp)</ContentArgs>
-    </PropertyGroup>
-    <MSbuild Projects="..\Content\Content.csproj" Targets="Build;Run"
-      Properties="RunArguments=$(ContentArgs);" />
-  </Target>
+  <Import Project="..\Content\BuildContent.targets" />
 </Project>
