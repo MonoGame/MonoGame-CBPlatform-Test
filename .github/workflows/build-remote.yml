@@ -32,6 +32,10 @@ jobs:
           dotnet-version: '${{ env.DotnetVersion }}'
           global-json-file: "./global.json"
 
+      - name: Restore Solution
+        working-directory: ./CBPlatformTest
+        run: dotnet restore
+
       - name: Build Content (DesktopGL)
         id: build_content
         uses: MonoGame/monogame-actions/build-content@v1
@@ -43,10 +47,6 @@ jobs:
           monogame-platform: 'DesktopGL'
           output-folder: 'CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/Content'
           upload-output: 'true'
-
-      - name: Restore DesktopGL
-        working-directory: ./CBPlatformTest
-        run: dotnet restore CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj
 
       - name: Build DesktopGL
         working-directory: ./CBPlatformTest
