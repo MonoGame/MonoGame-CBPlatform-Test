@@ -22,5 +22,4 @@
       <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
-  <Import Project="..\Content\BuildContent.targets" />
 </Project>

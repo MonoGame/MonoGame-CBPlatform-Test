@@ -23,5 +23,4 @@
       <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </BundleResource>
   </ItemGroup>
-  <Import Project="..\Content\BuildContent.targets" />
 </Project>

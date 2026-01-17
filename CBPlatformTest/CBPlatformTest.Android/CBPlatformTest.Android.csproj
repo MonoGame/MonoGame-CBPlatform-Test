@@ -26,5 +26,4 @@
       <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </AndroidAsset>
   </ItemGroup>
-  <Import Project="..\Content\BuildContent.targets" />
 </Project>
