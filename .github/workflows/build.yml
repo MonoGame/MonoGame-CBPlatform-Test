@@ -85,6 +85,10 @@ jobs:
 
       - name: Restore ${{ matrix.platform }}
         working-directory: ./CBPlatformTest
+        run: dotnet restore Content/Content.csproj -r ${{ matrix.runtime }}
+
+      - name: Restore ${{ matrix.platform }}
+        working-directory: ./CBPlatformTest
         run: dotnet restore ${{ matrix.project }} -r ${{ matrix.runtime }}
 
       - name: Build ${{ matrix.platform }} (iOS)
