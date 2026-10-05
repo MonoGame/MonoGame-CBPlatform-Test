@@ -1,0 +1,147 @@
+name: Build Content Separately
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+
+env:
+  DotnetVersion: 10.0.401
+  Configuration: ${{ inputs.configuration || 'Release' }}
+
+jobs:
+  build-content:
+    name: Content ${{ matrix.platform }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [DesktopGL, DesktopVK, WindowsDX12, Android, iOS]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate global.json
+        shell: bash
+        run: |
+          echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DotnetVersion }}
+          global-json-file: ./global.json
+
+      - name: Build content
+        uses: MonoGame/monogame-actions/build-content@v1
+        with:
+          content-builder-path: ./CBPlatformTest/Content
+          assets-path: ./CBPlatformTest/Content/Assets
+          monogame-platform: ${{ matrix.platform }}
+          output-folder: ./Output/${{ matrix.platform }}
+          configuration: ${{ env.Configuration }}
+          upload-output: 'true'
+
+  build-game:
+    name: Game ${{ matrix.platform }} (${{ matrix.runtime }})
+    needs: build-content
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: DesktopGL
+            os: windows-latest
+            project: CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj
+            runtime: win-x64
+            workload: ''
+            tfm: net10.0
+          - platform: DesktopVK
+            os: windows-latest
+            project: CBPlatformTest.DesktopVK/CBPlatformTest.DesktopVK.csproj
+            runtime: win-x64
+            workload: ''
+            tfm: net10.0
+          - platform: WindowsDX12
+            os: windows-latest
+            project: CBPlatformTest.WindowsDX12/CBPlatformTest.WindowsDX12.csproj
+            runtime: win-x64
+            workload: ''
+            tfm: net10.0
+          - platform: Android
+            os: windows-latest
+            project: CBPlatformTest.Android/CBPlatformTest.Android.csproj
+            runtime: android-arm64
+            workload: android
+            tfm: net10.0-android
+          - platform: iOS
+            os: macos-26
+            project: CBPlatformTest.iOS/CBPlatformTest.iOS.csproj
+            runtime: ios-arm64
+            workload: ios
+            tfm: net10.0-ios
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate global.json
+        shell: bash
+        run: |
+          echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DotnetVersion }}
+          global-json-file: ./global.json
+
+      - name: Install workload
+        if: ${{ matrix.workload != '' }}
+        run: dotnet workload install ${{ matrix.workload }}
+
+      - name: Set output paths
+        id: paths
+        shell: bash
+        run: |
+          PROJECT_DIR=$(dirname "${{ matrix.project }}")
+          if [ "${{ matrix.platform }}" == "iOS" ]; then
+            OUTPUT_DIR="bin/${{ env.Configuration }}/${{ matrix.tfm }}"
+          else
+            OUTPUT_DIR="bin/${{ env.Configuration }}/${{ matrix.tfm }}/${{ matrix.runtime }}"
+          fi
+          echo "project_dir=$PROJECT_DIR" >> $GITHUB_OUTPUT
+          echo "output_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
+          echo "content_output=./CBPlatformTest/$PROJECT_DIR/$OUTPUT_DIR" >> $GITHUB_OUTPUT
+
+      # The artifact holds the Content folder, so it lands at <output folder>/Content where BuildContent.targets expects it.
+      - name: Download content
+        uses: actions/download-artifact@v8
+        with:
+          pattern: content-output-${{ matrix.platform }}-${{ github.run_id }}-*
+          merge-multiple: true
+          path: ${{ steps.paths.outputs.content_output }}
+
+      - name: Restore
+        working-directory: ./CBPlatformTest
+        run: dotnet restore ${{ matrix.project }} -r ${{ matrix.runtime }}
+
+      - name: Build (iOS)
+        if: ${{ matrix.platform == 'iOS' }}
+        working-directory: ./CBPlatformTest
+        run: dotnet build -c ${{ env.Configuration }} ${{ matrix.project }} -p:WorkflowMode=true
+
+      - name: Build
+        if: ${{ matrix.platform != 'iOS' }}
+        working-directory: ./CBPlatformTest
+        run: dotnet build -c ${{ env.Configuration }} ${{ matrix.project }} -r ${{ matrix.runtime }} -p:WorkflowMode=true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.runtime }}-build
+          path: CBPlatformTest/${{ steps.paths.outputs.project_dir }}/${{ steps.paths.outputs.output_dir }}/

@@ -1,4 +1,4 @@
-name: Build Remote Content DesktopGL
+name: Build Multi-Platform with Remote Builder and Assets
 
 on:
   workflow_dispatch:
@@ -11,59 +11,151 @@ on:
         options:
           - Debug
           - Release
+      builder-repo:
+        description: 'Repository holding the Content Builder project, as owner/repo. Leave empty to use the builder in this repository.'
+        required: false
+        default: 'MonoGame/MonoGame-CBPlatform-BuilderTest'
+        type: string
+      assets-repo:
+        description: 'Repository holding the assets, as owner/repo. Leave empty to use the assets in this repository.'
+        required: false
+        default: 'MonoGame/MonoGame-CBPlatform-TestAssets'
+        type: string
 
 env:
-  DotnetVersion: 9.0.307
-  Configuration: ${{ github.event.inputs.configuration || 'Release' }}
+  DotnetVersion: 10.0.401
+  Configuration: ${{ inputs.configuration || 'Release' }}
 
 jobs:
-  build-remote-desktopgl:
-    runs-on: windows-latest
+  build:
+    name: ${{ matrix.platform }} (${{ matrix.runtime }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: DesktopGL
+            os: windows-latest
+            project: CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj
+            runtime: win-x64
+            workload: ''
+            tfm: net10.0
+          - platform: DesktopGL
+            os: ubuntu-latest
+            project: CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj
+            runtime: linux-x64
+            workload: ''
+            tfm: net10.0
+          - platform: DesktopGL
+            os: macos-26
+            project: CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj
+            runtime: osx-arm64
+            workload: ''
+            tfm: net10.0
+          - platform: DesktopVK
+            os: windows-latest
+            project: CBPlatformTest.DesktopVK/CBPlatformTest.DesktopVK.csproj
+            runtime: win-x64
+            workload: ''
+            tfm: net10.0
+          - platform: WindowsDX12
+            os: windows-latest
+            project: CBPlatformTest.WindowsDX12/CBPlatformTest.WindowsDX12.csproj
+            runtime: win-x64
+            workload: ''
+            tfm: net10.0
+          - platform: Android
+            os: windows-latest
+            project: CBPlatformTest.Android/CBPlatformTest.Android.csproj
+            runtime: android-arm64
+            workload: android
+            tfm: net10.0-android
+          - platform: iOS
+            os: macos-26
+            project: CBPlatformTest.iOS/CBPlatformTest.iOS.csproj
+            runtime: ios-arm64
+            workload: ios
+            tfm: net10.0-ios
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Generate global.json
+        shell: bash
         run: |
           echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
 
-      - name: Setup .NET Core SDK
-        uses: actions/setup-dotnet@v5
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '${{ env.DotnetVersion }}'
-          global-json-file: "./global.json"
+          dotnet-version: ${{ env.DotnetVersion }}
+          global-json-file: ./global.json
 
-      - name: Restore Solution
-        working-directory: ./CBPlatformTest
-        run: dotnet restore
+      - name: Install workload
+        if: ${{ matrix.workload != '' }}
+        run: dotnet workload install ${{ matrix.workload }}
 
-      - name: Build Content (DesktopGL)
-        id: build_content
+      # For a remote repository the builder and assets paths are folders inside that repository ('' for its root).
+      # For this repository they are relative to the repository root.
+      # The content output is the output folder of the game project. The builder writes a Content folder inside it.
+      - name: Set paths
+        id: paths
+        shell: bash
+        run: |
+          PROJECT_DIR=$(dirname "${{ matrix.project }}")
+          if [ "${{ matrix.platform }}" == "iOS" ]; then
+            OUTPUT_DIR="bin/${{ env.Configuration }}/${{ matrix.tfm }}"
+          else
+            OUTPUT_DIR="bin/${{ env.Configuration }}/${{ matrix.tfm }}/${{ matrix.runtime }}"
+          fi
+          if [ -n "${{ inputs.builder-repo }}" ]; then BUILDER_PATH="Content"; else BUILDER_PATH="./CBPlatformTest/Content"; fi
+          if [ -n "${{ inputs.assets-repo }}" ]; then ASSETS_PATH=""; else ASSETS_PATH="./CBPlatformTest/Content/Assets"; fi
+          echo "project_dir=$PROJECT_DIR" >> $GITHUB_OUTPUT
+          echo "output_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
+          echo "content_output=./CBPlatformTest/$PROJECT_DIR/$OUTPUT_DIR" >> $GITHUB_OUTPUT
+          echo "builder_path=$BUILDER_PATH" >> $GITHUB_OUTPUT
+          echo "assets_path=$ASSETS_PATH" >> $GITHUB_OUTPUT
+
+      - name: Build content
         uses: MonoGame/monogame-actions/build-content@v1
         with:
-          content-builder-repo: 'SimonDarksideJ/MonoGame-CBPlatform-Builder'
-          content-builder-path: 'Content'
-          assets-repo: 'SimonDarksideJ/MonoGame-CBPlatform-Assets'
-          assets-path: ''
-          monogame-platform: 'DesktopGL'
-          output-folder: 'CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/Content'
+          content-builder-repo: ${{ inputs.builder-repo }}
+          content-builder-path: ${{ steps.paths.outputs.builder_path }}
+          assets-repo: ${{ inputs.assets-repo }}
+          assets-path: ${{ steps.paths.outputs.assets_path }}
+          monogame-platform: ${{ matrix.platform }}
+          output-folder: ${{ steps.paths.outputs.content_output }}
+          configuration: ${{ env.Configuration }}
           upload-output: 'true'
 
-      - name: Build DesktopGL
+      - name: Restore
         working-directory: ./CBPlatformTest
-        run: dotnet build -c ${{ env.Configuration }} CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -p:WorkflowMode=true
+        run: dotnet restore ${{ matrix.project }} -r ${{ matrix.runtime }}
 
-      - name: Upload DesktopGL build artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: DesktopGL-build
-          path: CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/
-
-      - name: Publish DesktopGL
+      - name: Build (iOS)
+        if: ${{ matrix.platform == 'iOS' }}
         working-directory: ./CBPlatformTest
-        run: dotnet publish CBPlatformTest.DesktopGL/CBPlatformTest.DesktopGL.csproj -c ${{ env.Configuration }} -p:PublishReadyToRun=false -p:TieredCompilation=false -p:WorkflowMode=true
+        run: dotnet build -c ${{ env.Configuration }} ${{ matrix.project }} -p:WorkflowMode=true
 
-      - name: Upload DesktopGL publish artifact
-        uses: actions/upload-artifact@v5
+      - name: Build
+        if: ${{ matrix.platform != 'iOS' }}
+        working-directory: ./CBPlatformTest
+        run: dotnet build -c ${{ env.Configuration }} ${{ matrix.project }} -r ${{ matrix.runtime }} -p:WorkflowMode=true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: DesktopGL-publish
-          path: CBPlatformTest/CBPlatformTest.DesktopGL/bin/${{ env.Configuration }}/net9.0/publish/
+          name: ${{ matrix.platform }}-${{ matrix.runtime }}-build
+          path: CBPlatformTest/${{ steps.paths.outputs.project_dir }}/${{ steps.paths.outputs.output_dir }}/
+
+      # iOS publishing needs signing details and an Apple developer team, so the sample stops at the build.
+      - name: Publish
+        if: ${{ matrix.platform != 'iOS' }}
+        working-directory: ./CBPlatformTest
+        run: dotnet publish ${{ matrix.project }} -c ${{ env.Configuration }} -r ${{ matrix.runtime }} -p:WorkflowMode=true --self-contained
+
+      - name: Upload publish artifact
+        if: ${{ matrix.platform != 'iOS' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.runtime }}-publish
+          path: CBPlatformTest/${{ steps.paths.outputs.project_dir }}/${{ steps.paths.outputs.output_dir }}/publish/
