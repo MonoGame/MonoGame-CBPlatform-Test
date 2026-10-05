@@ -1,26 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0-ios</TargetFramework>
+    <TargetFramework>net10.0-ios</TargetFramework>
     <SupportedOSPlatformVersion>12.2</SupportedOSPlatformVersion>
     <CodesignKey>iPhone Developer</CodesignKey>
-    <WorkflowMode>false</WorkflowMode>
     <MonoGamePlatform>iOS</MonoGamePlatform>
+    <!-- Set to true by the workflows after the Build-Content action has already built the content. -->
+    <WorkflowMode>false</WorkflowMode>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CBPlatformTest.Core\CBPlatformTest.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.iOS" Version="3.8.5-preview.*" />
+    <UpToDateCheckInput Include="..\Content\Assets\**\*" />
   </ItemGroup>
   <ItemGroup>
-    <!-- For CI/CD workflow mode -->
-    <BundleResource Include="$(ProjectDir)bin\$(Configuration)\$(TargetFramework)\Content\**\*" Condition="'$(WorkflowMode)' == 'true' AND Exists('$(ProjectDir)bin\$(Configuration)\$(TargetFramework)\Content')">
-      <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </BundleResource>
-    <!-- For local builds -->
-    <BundleResource Include="$(ProjectDir)$(OutputPath)Content\**\*" Condition="'$(WorkflowMode)' != 'true' AND Exists('$(ProjectDir)$(OutputPath)Content')">
-      <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </BundleResource>
+    <PackageReference Include="MonoGame.Framework.iOS" Version="3.8.6-preview.*" />
   </ItemGroup>
+  <Import Project="..\Content\BuildContent.targets" />
 </Project>

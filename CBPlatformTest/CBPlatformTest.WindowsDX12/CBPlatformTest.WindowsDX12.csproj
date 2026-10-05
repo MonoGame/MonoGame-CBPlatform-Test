@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>../CBPlatformTest.Core/Content/Icon.ico</ApplicationIcon>
+    <AssemblyName>CBPlatformTest</AssemblyName>
+    <MonoGamePlatform>WindowsDX12</MonoGamePlatform>
+    <!-- Set to true by the workflows after the Build-Content action has already built the content. -->
+    <WorkflowMode>false</WorkflowMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CBPlatformTest.Core\CBPlatformTest.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <UpToDateCheckInput Include="..\Content\Assets\**\*" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.Native" Version="3.8.6-preview.*" />
+    <PackageReference Include="MonoGame.Runtime.Windows.DX12" Version="3.8.6-preview.*" />
+  </ItemGroup>
+  <Import Project="..\Content\BuildContent.targets" />
+</Project>
