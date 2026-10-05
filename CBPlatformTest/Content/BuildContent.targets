@@ -1,12 +1,47 @@
 <Project>
-  <Target Name="BuildContent" BeforeTargets="BeforeCompile">
+  <!--
+    Builds the content when a game project builds. Based on the MonoGame Content Builder template.
+    The WorkflowMode condition is specific to this sample. The workflows build the content first with the
+    MonoGame Build-Content action, then pass -p:WorkflowMode=true so the game build does not build it again.
+    AddGeneratedContentAssets still runs in that case and picks up the content the action wrote to the output folder.
+  -->
+  <Target Name="BuildContent" BeforeTargets="BeforeCompile" Condition="'$(WorkflowMode)' != 'true'">
+    <!-- Restore first, so a platform project builds on a fresh clone. Restore needs its own evaluation, hence the unique session property. -->
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Content.csproj" Targets="Restore" Properties="MSBuildRestoreSessionId=$([System.Guid]::NewGuid())" RemoveProperties="Configuration;TargetFramework;RuntimeIdentifier;RuntimeIdentifiers" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Content.csproj" Targets="Build" RemoveProperties="Configuration;TargetFramework;RuntimeIdentifier;RuntimeIdentifiers">
+      <Output TaskParameter="TargetOutputs" ItemName="_ContentBuilderAssembly" />
+    </MSBuild>
     <PropertyGroup>
-      <ContentOutput>$(ProjectDir)$(OutputPath)</ContentOutput>
-      <ContentTemp>$(ProjectDir)$(IntermediateOutputPath)</ContentTemp>
-      <ContentArgs>build -p $(MonoGamePlatform) -s Content/Assets -o $(ContentOutput) -i $(ContentTemp)</ContentArgs>
-      <ContentCommand>$(MSBuildThisFileDirectory)bin\$(Configuration)\net9.0\Content</ContentCommand>
+      <ContentOutput>$([MSBuild]::NormalizePath('$(ProjectDir)', '$(OutputPath)').TrimEnd('\/'))</ContentOutput>
+      <ContentTemp>$([MSBuild]::NormalizePath('$(ProjectDir)', '$(IntermediateOutputPath)').TrimEnd('\/'))</ContentTemp>
+      <ContentArgs>build -p $(MonoGamePlatform) -s "$(MSBuildThisFileDirectory)Assets" -o "$(ContentOutput)" -i "$(ContentTemp)"</ContentArgs>
+      <ContentCommand>@(_ContentBuilderAssembly->'%(RootDir)%(Directory)%(Filename)')</ContentCommand>
     </PropertyGroup>
-    <MSBuild Projects="$(MSBuildThisFileDirectory)Content.csproj" Targets="Build" RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers" />
-    <Exec Command="$(ContentCommand) $(ContentArgs)" WorkingDirectory="$(MSBuildThisFileDirectory)..\" CustomErrorRegularExpression="\[E\] .+" CustomWarningRegularExpression="\[W\] .+" />
+    <Exec Command="&quot;$(ContentCommand)&quot; $(ContentArgs)" WorkingDirectory="$(MSBuildThisFileDirectory)..\" CustomErrorRegularExpression="\[E\] .+" CustomWarningRegularExpression="\[W\] .+" />
    </Target>
+  <Target Name="AddGeneratedContentAssets"
+    AfterTargets="BuildContent">
+    <ItemGroup>
+      <GeneratedAsset Include="$([MSBuild]::NormalizePath('$(ProjectDir)', '$(OutputPath)'))Content\**\*" />
+
+      <!-- Post Process Android Assets -->
+      <AndroidAsset Include="@(GeneratedAsset)"
+        Condition="'$(MonoGamePlatform)' == 'Android'">
+        <Link>Content\%(GeneratedAsset.RecursiveDir)%(GeneratedAsset.Filename)%(GeneratedAsset.Extension)</Link>
+      </AndroidAsset>
+
+      <!-- Post Process iOS Bundle Resources -->
+      <BundleResource Include="@(GeneratedAsset)"
+        Condition="'$(MonoGamePlatform)' == 'iOS'">
+        <Link>Content\%(GeneratedAsset.RecursiveDir)%(GeneratedAsset.Filename)%(GeneratedAsset.Extension)</Link>
+      </BundleResource>
+
+      <!-- Copy content for `dotnet publish` builds -->
+      <ContentWithTargetPath Include="@(GeneratedAsset)"
+        Condition="'$(MonoGamePlatform)' != 'Android' And '$(MonoGamePlatform)' != 'iOS'">
+        <TargetPath>Content\%(GeneratedAsset.RecursiveDir)%(GeneratedAsset.Filename)%(GeneratedAsset.Extension)</TargetPath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ContentWithTargetPath>
+    </ItemGroup>
+  </Target>
 </Project>
